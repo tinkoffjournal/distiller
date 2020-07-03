@@ -1,0 +1,10 @@
+[report]
+precision = 2
+skip_empty = true
+sort = cover
+omit = distiller/json/*
+exclude_lines =
+	pragma: no cover
+	if TYPE_CHECKING:
+	__str__
+	__repr__

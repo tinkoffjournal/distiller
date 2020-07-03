@@ -1,7 +1,9 @@
 dist/
 venv/
-.mypy_cache
-.pytest_cache
+.mypy_cache/
+.pytest_cache/
 .coverage
-.ipython
+coverage.xml
+htmlcov/
+tests/data/
 *.pyc

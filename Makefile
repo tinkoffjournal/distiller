@@ -16,10 +16,13 @@ lint:
 test:
 	pytest -vv
 
-cover:
-	coverage erase
-	coverage run --include=$(DIR)/* -m pytest
-	coverage report -m
+cov:
+	pytest --cov=$(DIR) --cov-report term-missing:skip-covered
 
 check:
-	make lint && make type
+	make lint
+	make type
+
+FILE = index
+play:
+	python -m tests.playground $(FILE)
