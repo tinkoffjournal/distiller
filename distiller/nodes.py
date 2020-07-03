@@ -95,6 +95,11 @@ class Node(BaseNode):
         schema_extra = _modify_node_schema
 
 
+class InvalidNode(BaseNode):
+    kind: NodeKind = Field(default=INVALID_NODE_KIND, const=True)
+    tagname: str = Field(title='Original node tag name')
+
+
 class TextNode(BaseNode):
     kind: NodeKind = Field(default=TEXT_NODE_KIND, const=True)
     content: str = Field(default='', title='Text node inner content')
@@ -118,11 +123,7 @@ def text(content: str = '') -> TextNode:
     return TextNode(content=content)
 
 
-def invalid_node(**attrs: Any) -> Node:
-    return Node(kind=INVALID_NODE_KIND)
-
-
-AnyNode = Union[TextNode, Node]
+AnyNode = Union[TextNode, Node, InvalidNode]
 NodeChildren = MutableSequence[AnyNode]
 NodeType = Type[Node]
 
@@ -134,8 +135,12 @@ def dictify_recursively(node: AnyNode, **kwargs: Any) -> Dict[str, Any]:
         return node.dict()
     exclude = kwargs.get('exclude') or set()
     kwargs.update(exclude=exclude.union({'children'}))
-    children = map(lambda child: dictify_recursively(child, **kwargs), node.children)
-    return {**node.dict(**kwargs), 'children': tuple(children)}
+    dictified: dict = node.dict(**kwargs)
+    children = getattr(node, 'children', None)
+    if children:
+        children = map(lambda child: dictify_recursively(child, **kwargs), children)
+        dictified.update(children=tuple(children))
+    return dictified
 
 
 def load_nodes_types_from_module(module: Optional[ModuleType]) -> Iterator[NodeType]:

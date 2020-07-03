@@ -7,9 +7,11 @@ from bs4.element import NavigableString, Tag
 from lxml.etree import HTMLParser
 from pydantic import ValidationError
 
-from distiller.nodes import AnyNode, Node, NodeType, TextNode, invalid_node
+from distiller.nodes import AnyNode, InvalidNode, Node, NodeType, TextNode
 
 from .mapper import NodeTypesMapper
+
+ParsedNode = Union[Node, InvalidNode, None]
 
 
 class MarkupParserError(ValueError):
@@ -49,7 +51,7 @@ def parse_markup(
         for tag in relation.select(body):
             builder.recreate_tag_node(tag, node_type)
 
-    nodes = body.node.children if body.node else ()
+    nodes = body.node.children if isinstance(body.node, Node) else ()
     return nodes, builder.errors
 
 
@@ -88,7 +90,7 @@ class TreeBuilder(LXMLTreeBuilder):
     def skip_node(self, node_name: str) -> bool:
         return self.include and node_name not in self.include or node_name in self.exclude
 
-    def create_node_from_tag(self, tag: 'TagNode', node_type: NodeType = None) -> Optional[Node]:
+    def create_node_from_tag(self, tag: 'TagNode', node_type: NodeType = None) -> ParsedNode:
         node_kind = tag.name
         if self.skip_node(node_kind):
             return None
@@ -109,10 +111,11 @@ class TreeBuilder(LXMLTreeBuilder):
             if self.raise_validation_error:
                 raise exc
             self.errors.append(MarkupParserError(reason=exc, context=str(self)))
-            return invalid_node(**node_attrs)
+            return InvalidNode(tagname=node_kind, **node_attrs)
 
         # Pass outer context
-        node.update_context(parent=tag.parent_node, **self.context)
+        parent_node = tag.parent_node if isinstance(tag.parent_node, Node) else None
+        node.update_context(parent=parent_node, **self.context)
 
         # node.children must be set as instance attribute, otherwise Pydantic uses iterators
         node.children = deque()
@@ -124,7 +127,7 @@ class TreeBuilder(LXMLTreeBuilder):
 
     def recreate_tag_node(self, tag: 'TagNode', updated_node_type: NodeType) -> None:
         updated_node = self.create_node_from_tag(tag, updated_node_type)
-        if not updated_node:
+        if not isinstance(updated_node, Node):
             return
 
         # No currently set node -> no update needed
@@ -132,7 +135,7 @@ class TreeBuilder(LXMLTreeBuilder):
             tag.node = updated_node
             return
 
-        updated_node.children = tag.node.children
+        updated_node.children = tag.node.children  # type: ignore
         current_node_id = id(tag.node)
         tag.node = updated_node
         # Top-level tag -> no references update
@@ -153,20 +156,20 @@ class TreeBuilder(LXMLTreeBuilder):
 
 
 class TagContents(deque):
-    ref: Node
+    ref: ParsedNode
 
-    def __init__(self, ref: Node):
+    def __init__(self, ref: ParsedNode):
         super().__init__()
         self.ref = ref
 
     def append(self, el: Union['TagNode', 'StringNode']) -> None:
-        if el.node is not None:
+        if el.node and isinstance(self.ref, Node):
             self.ref.children.append(el.node)
         super().append(el)
 
 
 class TagNode(Tag):
-    node: Optional[Node] = None
+    node: ParsedNode = None
     contents: TagContents
 
     def __init__(
@@ -180,7 +183,7 @@ class TagNode(Tag):
             self.contents = TagContents(ref=self.node)
 
     @property
-    def parent_node(self) -> Optional[Node]:
+    def parent_node(self) -> ParsedNode:
         parent_tag: TagNode = self.parent
         if parent_tag and parent_tag.name != 'body':
             return parent_tag.node

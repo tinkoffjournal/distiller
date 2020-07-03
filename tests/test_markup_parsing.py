@@ -68,7 +68,7 @@ def test_tagified_parsing(markup, expected):
 
 def test_invalid_nodes_parsing_no_raise():
     result, errors = MarkupDistiller(types_module=current_module())('<strict>')
-    assert result.recursive_dict()['nodes'] == (node_dict(INVALID_NODE_KIND),)
+    assert result.recursive_dict()['nodes'] == (node_dict(INVALID_NODE_KIND, tagname='strict'),)
     assert len(errors) > 0
 
 

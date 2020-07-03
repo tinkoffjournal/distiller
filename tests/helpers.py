@@ -2,7 +2,9 @@ from distiller.nodes import TEXT_NODE_KIND
 
 
 def node_dict(kind: str, *children: dict, **attrs) -> dict:
-    return {'kind': kind, 'children': children, **attrs}
+    if children:
+        attrs.update(children=children)
+    return {'kind': kind, **attrs}
 
 
 def text_dict(content: str) -> dict:
