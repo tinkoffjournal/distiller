@@ -3,11 +3,13 @@ from typing import Any, Callable, Dict, Iterable, Tuple, Type, Union
 
 from ..base import BaseDistiller, DistillationResult, DistilledObject
 from ..helpers import glue_multi_newlines
+from ..nodes import Node
 from .mapper import MapperConfig, NodeTypesMapper
-from .parser import parse_markup
+from .parser import MarkupParser
 from .preprocessor import compile_custom_tokens_patterns, tagify_custom_tokens
 
 Preprocessor = Callable[[str], str]
+Postprocessor = Callable[[Node], None]
 CustomTagConfig = Union[Tuple[str, str, str], str]
 DEFAULT_PREPROCESSORS = (glue_multi_newlines,)
 
@@ -15,6 +17,7 @@ DEFAULT_PREPROCESSORS = (glue_multi_newlines,)
 class MarkupDistiller(BaseDistiller):
     types_mapper: NodeTypesMapper
     preprocessors: Tuple[Preprocessor, ...]
+    postprocessors: Tuple[Postprocessor, ...]
 
     def __init__(
         self,
@@ -24,6 +27,7 @@ class MarkupDistiller(BaseDistiller):
         include: Iterable[str] = None,
         exclude: Iterable[str] = None,
         preprocessors: Iterable[Preprocessor] = None,
+        postprocessors: Iterable[Postprocessor] = None,
         tagify: CustomTagConfig = None,
     ):
         super().__init__(
@@ -40,23 +44,26 @@ class MarkupDistiller(BaseDistiller):
         if tagify:
             self.configure_custom_tags_parsing(tagify)
         self.preprocessors = DEFAULT_PREPROCESSORS + self.preprocessors
+        self.postprocessors = tuple(postprocessors or ())
 
     def __call__(
         self, source: str, context: Dict[str, Any] = None, raise_validation_error: bool = False,
     ) -> DistillationResult:
         obj = self.return_type()
         markup = self.preprocess(source) if source else ''
-        nodes, errors = parse_markup(
+        parser_instance = MarkupParser(
             markup,
             mapper=self.types_mapper,
             context=context,
             include=self.include,
             exclude=self.exclude,
             raise_validation_error=raise_validation_error,
-            queue=obj._State.tasks,
+            nodetasks=obj._State.tasks,
+            postprocessors=self.postprocessors,
         )
-        obj.nodes = nodes
-        return obj, errors
+        obj._State.parser = parser_instance
+        obj.nodes = parser_instance.nodes
+        return obj, parser_instance.errors
 
     def configure_custom_tags_parsing(self, config_: CustomTagConfig) -> None:
         config = config_ if isinstance(config_, tuple) else tuple(char for char in config_)

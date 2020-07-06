@@ -4,7 +4,7 @@ from typing import Dict, Iterable, Mapping, NamedTuple, Set, Tuple
 from bs4.element import Tag
 from soupsieve import SoupSieve, compile as sv_compile
 
-from distiller.nodes import Node, NodeType
+from ..nodes import Node, NodeType
 
 
 class NodeTypesMapper(NamedTuple):

@@ -1,5 +1,17 @@
 from collections import deque
-from typing import Any, Iterable, List, MutableSequence, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Deque,
+    Iterable,
+    List,
+    MutableSequence,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    Union,
+)
 
 from bs4 import BeautifulSoup
 from bs4.builder._lxml import LXMLTreeBuilder
@@ -7,8 +19,7 @@ from bs4.element import NavigableString, Tag
 from lxml.etree import HTMLParser
 from pydantic import ValidationError
 
-from distiller.nodes import AnyNode, InvalidNode, Node, NodeType, TextNode
-
+from ..nodes import AnyNode, InvalidNode, Node, NodeType, TextNode
 from .mapper import NodeTypesMapper
 
 ParsedNode = Union[Node, InvalidNode, None]
@@ -23,36 +34,55 @@ class MarkupParserError(ValueError):
         self.context = context
 
 
-def parse_markup(
-    markup: str,
-    mapper: NodeTypesMapper = None,
-    context: dict = None,
-    include: Set[str] = None,
-    exclude: Set[str] = None,
-    raise_validation_error: bool = False,
-    queue: MutableSequence = None,
-) -> Tuple[Iterable[AnyNode], Sequence[MarkupParserError]]:
-    builder = TreeBuilder(
-        mapper=mapper,
-        context=context,
-        include=include,
-        exclude=exclude,
-        raise_validation_error=raise_validation_error,
-        queue=queue,
-    )
-    body: TagNode = BeautifulSoup(
-        markup=markup, builder=builder, element_classes=_ELEMENT_CLASSES,
-    ).body
-    if not body:
-        return (), ()
+class MarkupParser:
+    builder: 'TreeBuilder'
+    soup: BeautifulSoup
+    nodestack: Deque[Node]
+    nodes: Iterable[AnyNode] = ()
+    errors: Sequence[MarkupParserError] = ()
 
-    # To map relation rules between elements, we need to have the whole soup built
-    for relation, node_type in mapper.relations_rules if mapper else ():
-        for tag in relation.select(body):
-            builder.recreate_tag_node(tag, node_type)
+    def __init__(
+        self,
+        markup: str,
+        mapper: NodeTypesMapper = None,
+        postprocessors: Iterable[Callable] = None,
+        context: dict = None,
+        include: Set[str] = None,
+        exclude: Set[str] = None,
+        raise_validation_error: bool = False,
+        builder_cls: Type['TreeBuilder'] = None,
+        nodetasks: MutableSequence = None,
+    ):
+        self.nodestack = deque()
+        self.builder = (builder_cls or TreeBuilder)(
+            mapper=mapper,
+            context=context,
+            include=include,
+            exclude=exclude,
+            raise_validation_error=raise_validation_error,
+            nodetasks=nodetasks,
+            nodestack=self.nodestack,
+        )
+        self.soup = BeautifulSoup(
+            markup=markup, builder=self.builder, element_classes=_ELEMENT_CLASSES,
+        )
+        body: TagNode = self.soup.body
+        if not body:
+            return
 
-    nodes = body.node.children if isinstance(body.node, Node) else ()
-    return nodes, builder.errors
+        # To map relation rules between elements, we need to have the whole soup built
+        for relation, node_type in mapper.relations_rules if mapper else ():
+            for tag in relation.select(body):
+                self.builder.recreate_tag_node(tag, node_type)
+
+        self.nodes = body.node.children if isinstance(body.node, Node) else ()
+        self.errors = self.builder.errors
+
+        # Apply postprocessors
+        if postprocessors:
+            for node in self.nodestack:
+                for postprocess in postprocessors:
+                    postprocess(node)
 
 
 class TreeBuilder(LXMLTreeBuilder):
@@ -62,7 +92,8 @@ class TreeBuilder(LXMLTreeBuilder):
     exclude: Set[str]
     errors: List[MarkupParserError]
     raise_validation_error: bool
-    queue: Optional[MutableSequence]
+    nodetasks: Optional[MutableSequence]
+    nodestack: MutableSequence
 
     def __init__(
         self,
@@ -72,7 +103,8 @@ class TreeBuilder(LXMLTreeBuilder):
         include: Set[str] = None,
         exclude: Set[str] = None,
         raise_validation_error: bool = False,
-        queue: MutableSequence = None,
+        nodetasks: MutableSequence = None,
+        nodestack: MutableSequence = None,
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
@@ -82,7 +114,8 @@ class TreeBuilder(LXMLTreeBuilder):
         self.exclude = exclude or set()
         self.raise_validation_error = raise_validation_error
         self.errors = []
-        self.queue = queue
+        self.nodetasks = nodetasks
+        self.nodestack = nodestack if nodestack is not None else deque()
 
     def parser_for(self, *args: Any, **kwargs: Any) -> HTMLParser:
         return HTMLParser(target=self, strip_cdata=False, recover=True, remove_comments=True)
@@ -123,6 +156,9 @@ class TreeBuilder(LXMLTreeBuilder):
         # Add node post-init task to queue
         self.node_post_init(node)
 
+        # Add node to stack for further postprocessing
+        self.nodestack.append(node)
+
         return node
 
     def recreate_tag_node(self, tag: 'TagNode', updated_node_type: NodeType) -> None:
@@ -148,11 +184,11 @@ class TreeBuilder(LXMLTreeBuilder):
                 break
 
     def node_post_init(self, node: Node) -> None:
-        if self.queue is None:
+        if self.nodetasks is None:
             return
         task = node.post_init_method
         if task:
-            self.queue.append(task)
+            self.nodetasks.append(task)
 
 
 class TagContents(deque):

@@ -2,7 +2,7 @@ import re
 from collections import deque
 from typing import Deque, Pattern, Tuple
 
-from distiller.helpers import NodeKind
+from ..helpers import NodeKind
 
 
 def tagify_custom_tokens(

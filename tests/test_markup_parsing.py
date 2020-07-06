@@ -29,6 +29,15 @@ def test_preprocessors_applied(fake):
     assert '?' not in str(result.serialize())
 
 
+def test_postprocessors_applied():
+    def postprocessor(node: Node) -> None:
+        node.bar = 'MODIFIED'
+
+    distill = MarkupDistiller(postprocessors=[postprocessor])
+    distilled, _ = distill('<foo /><bar /><baz />')
+    assert all(map(lambda node: node.bar == 'MODIFIED', distilled.nodes))
+
+
 @mark.parametrize('config', ['[]', ('[', ']')])
 def test_invalid_tagify_config(config):
     with raises(AssertionError):

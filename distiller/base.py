@@ -85,6 +85,7 @@ class DistilledObject(BaseModel):
 
     class _State:
         finalized: bool = False
+        parser: Any = None
         tasks: 'DistilledObjectTasks' = []
 
 
