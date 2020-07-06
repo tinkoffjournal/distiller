@@ -1,10 +1,22 @@
 from inspect import getmembers, isclass
+from io import StringIO
 from types import ModuleType
-from typing import Any, Callable, Dict, Iterator, MutableSequence, NamedTuple, Optional, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    MutableSequence,
+    NamedTuple,
+    Optional,
+    Type,
+    Union,
+)
 
 from pydantic import BaseModel, Extra, Field, NoneStr, validator
 
-from .helpers import NodeKind
+from .helpers import NodeKind, jsonify_node_value
 
 RESERVED_NODE_ATTRS_NAMES = {'kind', 'children'}
 DEFAULT_NODE_SCHEMA_TITLE = 'Distilled node'
@@ -22,6 +34,10 @@ class BaseNode(BaseModel):
 
     def serialize(self, **kwargs: Any) -> Any:
         return self.dict(**kwargs)
+
+    def to_html(self) -> str:
+        raise NotImplementedError  # pragma: no cover
+
 
 class Node(BaseNode):
     kind: NodeKind = Field(default=None, title='Distilled node kind')
@@ -43,6 +59,28 @@ class Node(BaseNode):
             children = map(lambda child: child.serialize(**kwargs), self.children)
             serialized.update(children=tuple(children))
         return serialized
+
+    def to_html(self) -> str:
+        serialized = self.dict(exclude={'children'})
+        tagname = serialized.pop('kind', None)
+        if not tagname:
+            return ''
+        attrs_map = {}
+        positional_attrs = []
+        for attr_name, attr_value in serialized.items():
+            if isinstance(attr_value, bool):
+                if attr_value is True:
+                    positional_attrs.append(attr_name)
+            elif isinstance(attr_value, (str, int)):
+                attrs_map[attr_name] = attr_value
+            else:
+                attrs_map[attr_name] = jsonify_node_value(attr_value)
+        attrs = ''.join(f' {attr}="{value}"' for attr, value in attrs_map.items())
+        if positional_attrs:
+            attrs = f'{attrs} {" ".join(positional_attrs)}'
+        if self.children:
+            return f'<{tagname}{attrs}>{nodelist_to_html(self.children)}</{tagname}>'
+        return f'<{tagname}{attrs} />'
 
     @classmethod
     def get_node_kind_value(cls) -> NodeKind:
@@ -117,10 +155,16 @@ class InvalidNode(BaseNode):
     kind: NodeKind = Field(default=INVALID_NODE_KIND, const=True)
     tagname: str = Field(title='Original node tag name')
 
+    def to_html(self) -> str:
+        return f'<{self.kind} />'
+
 
 class TextNode(BaseNode):
     kind: NodeKind = Field(default=TEXT_NODE_KIND, const=True)
     content: str = Field(default='', title='Text node inner content')
+
+    def to_html(self) -> str:
+        return self.content
 
     @classmethod
     def create(cls, content: str) -> 'TextNode':
@@ -145,6 +189,13 @@ Node.update_forward_refs()
 
 def text(content: str = '') -> TextNode:
     return TextNode(content=content)
+
+
+def nodelist_to_html(nodelist: Iterable[AnyNode]) -> str:
+    with StringIO() as buff:
+        for node in nodelist:
+            buff.write(node.to_html())
+        return buff.getvalue()
 
 
 def load_nodes_types_from_module(module: Optional[ModuleType]) -> Iterator[NodeType]:

@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Iterable, MutableSequence, Sequence, Set
 from pydantic import BaseModel, Field
 from pydantic.schema import schema
 
-from .nodes import AnyNode, NodeType, dictify_recursively, load_nodes_types_from_module
+from .nodes import AnyNode, NodeType, load_nodes_types_from_module, nodelist_to_html
 
 DistillerError = ValueError
 DistillationResult = Tuple['DistilledObject', Sequence[DistillerError]]
@@ -49,6 +49,9 @@ class DistilledObject(BaseModel):
         serialized = self.dict(exclude={'nodes'})
         nodes = tuple(node.serialize(**kwargs) for node in self.nodes)
         return {**serialized, 'nodes': nodes}
+
+    def to_html(self) -> str:
+        return nodelist_to_html(self.nodes)
 
     @property
     def _tasks(self) -> Iterable[Callable]:

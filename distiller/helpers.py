@@ -1,6 +1,8 @@
 from inspect import getmodule, stack
+from json import dumps as json_dumps
 from re import compile as re_compile
 from types import ModuleType
+from typing import Any
 
 from pydantic import ConstrainedStr
 from pydantic.validators import strict_str_validator
@@ -38,3 +40,9 @@ def glue_multi_newlines(markup: str) -> str:
 def current_module() -> ModuleType:
     parentframe = stack()[1][0]
     return getmodule(parentframe)  # type: ignore
+
+
+def jsonify_node_value(value: Any) -> str:
+    jsonified = json_dumps(value, ensure_ascii=False)
+    jsonified = jsonified.replace('"', '\\"').replace('\n', '\\n')
+    return jsonified

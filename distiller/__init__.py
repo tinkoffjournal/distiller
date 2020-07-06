@@ -1,6 +1,6 @@
 """HTML/JSON documents parser into Pydantic models"""
 
-__version__ = '0.1.0alpha'
+__version__ = '0.1.0beta'
 
 from pydantic import ValidationError
 
@@ -15,4 +15,12 @@ except ModuleNotFoundError:  # pragma: no cover
 
 DistillerError = ValidationError
 
-__all__ = ('MarkupDistiller', 'Distilled', 'DistillerError', 'Node')
+__all__ = (
+    'MarkupDistiller',
+    'Distilled',
+    'DistillerError',
+    'Node',
+    'TextNode',
+    'InvalidNode',
+    'NodeKind',
+)
