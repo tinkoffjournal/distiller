@@ -45,10 +45,10 @@ class BaseDistiller:
 class DistilledObject(BaseModel):
     nodes: Iterable[AnyNode] = Field(default=(), title='Distilled body')
 
-    def recursive_dict(self, **kwargs: Any) -> Dict[str, Any]:
-        dictified = self.dict(exclude={'nodes'})
-        nodes = tuple(dictify_recursively(node, **kwargs) for node in self.nodes)
-        return {**dictified, 'nodes': nodes}
+    def serialize(self, **kwargs: Any) -> Dict[str, Any]:
+        serialized = self.dict(exclude={'nodes'})
+        nodes = tuple(node.serialize(**kwargs) for node in self.nodes)
+        return {**serialized, 'nodes': nodes}
 
     @property
     def _tasks(self) -> Iterable[Callable]:

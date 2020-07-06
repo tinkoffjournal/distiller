@@ -19,10 +19,14 @@ class Strict(Node):
     val: str
 
 
+class Boolean(Node):
+    enabled: bool = False
+
+
 def test_preprocessors_applied(fake):
     distill = MarkupDistiller(preprocessors=[lambda markup: fake.bothify(markup)])
     result, _ = distill('????')
-    assert '?' not in str(result.recursive_dict())
+    assert '?' not in str(result.serialize())
 
 
 @mark.parametrize('config', ['[]', ('[', ']')])
@@ -33,8 +37,24 @@ def test_invalid_tagify_config(config):
 
 def test_empty_markup_parsing():
     result, errors = MarkupDistiller()('')
-    assert result.recursive_dict()['nodes'] == ()
+    assert result.serialize()['nodes'] == ()
     assert errors == ()
+
+
+@mark.parametrize(
+    'markup,expected',
+    [
+        ('<boolean />', False),
+        ('<boolean enabled />', True),
+        ('<boolean enabled=true />', True),
+        ('<boolean enabled=any />', True),
+        ('<boolean enabled=false />', False),
+    ],
+    ids=['default_value', 'no_value', 'true_value', 'any_value', 'false_value'],
+)
+def test_positional_html_attrs(markup, expected):
+    result, _ = MarkupDistiller(types_module=current_module())(markup)
+    assert result.nodes[0].enabled == expected
 
 
 def test_excluded_nodes():
@@ -48,7 +68,7 @@ def test_excluded_nodes():
 
     distill = MarkupDistiller(exclude=excluded, types_module=current_module())
     result, _ = distill('<p>Text[foo]</p><bar>')
-    check_excluded(result.recursive_dict()['nodes'])
+    check_excluded(result.serialize()['nodes'])
 
 
 @mark.parametrize(
@@ -63,12 +83,12 @@ def test_excluded_nodes():
 def test_tagified_parsing(markup, expected):
     distill = MarkupDistiller(tagify='[/]')
     result, _ = distill(markup)
-    assert list(result.recursive_dict()['nodes']) == expected
+    assert list(result.serialize()['nodes']) == expected
 
 
 def test_invalid_nodes_parsing_no_raise():
     result, errors = MarkupDistiller(types_module=current_module())('<strict>')
-    assert result.recursive_dict()['nodes'] == (node_dict(INVALID_NODE_KIND, tagname='strict'),)
+    assert result.serialize()['nodes'] == (node_dict(INVALID_NODE_KIND, tagname='strict'),)
     assert len(errors) > 0
 
 
@@ -80,7 +100,7 @@ def test_invalid_nodes_parsing_raise():
 def test_predefined_rules():
     distill = MarkupDistiller(types_module=current_module())
     result, _ = distill('<foo />')
-    assert result.recursive_dict()['nodes'] == (node_dict('foo', bar='pax'),)
+    assert result.serialize()['nodes'] == (node_dict('foo', bar='pax'),)
 
 
 @mark.parametrize(
@@ -106,4 +126,4 @@ def test_predefined_rules():
 )
 def test_mapping_css_rules(markup, rules, expected):
     result, _ = MarkupDistiller(rules=rules)(markup)
-    assert list(result.recursive_dict()['nodes']) == expected
+    assert list(result.serialize()['nodes']) == expected

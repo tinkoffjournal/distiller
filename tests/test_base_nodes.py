@@ -1,4 +1,5 @@
 from faker import Faker
+from pydantic import BaseModel
 from pytest import mark
 
 from distiller import Distilled
@@ -13,6 +14,15 @@ class Lead(Node):
     @classmethod
     def modify_attrs(cls, attrs: dict) -> None:
         attrs.update(modified=True)
+
+
+class Nested(BaseModel):
+    pax: int = 42
+
+
+class Complex(Node):
+    foo: str = 'bar'
+    nested: Nested
 
 
 def test_nodes_types_mapping():
@@ -67,12 +77,17 @@ def test_node_kind_setup(node, node_kind):
     assert node.kind == node_kind
 
 
+def test_inner_object_serialization():
+    node = Complex(nested=Nested(), foo='baaz')
+    assert node.serialize() == node_dict(node.kind, nested=node.nested.dict(), foo='baaz')
+
+
 def test_base_nodes_serialization(fake: Faker):
     # Paragraph-like node with single text child
     lead_text = fake.sentence()
     lead = Lead(children=[text(lead_text)])
     lead_dict = node_dict(lead.kind, text_dict(lead_text))
-    assert lead.recursive_dict() == lead_dict
+    assert lead.serialize() == lead_dict
 
     # Node with text & inline nodes
     text_before, text_inside, text_after = (fake.sentence() for _ in range(3))
@@ -92,7 +107,7 @@ def test_base_nodes_serialization(fake: Faker):
         text_dict(text_after),
         foo='bar',
     )
-    assert paragraph.recursive_dict() == paragraph_dict
+    assert paragraph.serialize() == paragraph_dict
 
     # All together now
     distilled = Distilled(nodes=[lead, paragraph])
@@ -100,4 +115,4 @@ def test_base_nodes_serialization(fake: Faker):
         lead_dict,
         paragraph_dict,
     )
-    assert distilled.recursive_dict()['nodes'] == serialized
+    assert distilled.serialize()['nodes'] == serialized

@@ -10,7 +10,7 @@ class Foo(Node):
 
 
 class Bar(Node):
-    ...
+    pax: int = 42
 
 
 NODES = {Foo, Bar}
