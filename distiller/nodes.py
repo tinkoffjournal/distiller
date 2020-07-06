@@ -198,6 +198,31 @@ def nodelist_to_html(nodelist: Iterable[AnyNode]) -> str:
         return buff.getvalue()
 
 
+def deserialize_nodelist(
+    nodelist: Iterable[Dict[str, Any]], types_index: Dict[str, NodeType] = None
+) -> Iterator[AnyNode]:
+    types_index = types_index or {}
+    for node_dict in nodelist:
+        node_dict = node_dict.copy()
+        node_kind = node_dict.pop('kind', None)
+        if not node_kind:
+            continue
+        if node_kind == TEXT_NODE_KIND:
+            content = node_dict.get('content')
+            if content:
+                yield TextNode.construct(content=content)
+        elif node_kind == INVALID_NODE_KIND:
+            tagname = node_dict.pop('tagname', None)
+            if tagname:
+                yield InvalidNode.construct(**node_dict, tagname=tagname)  # type: ignore
+        else:
+            children = node_dict.get('children')
+            if children:
+                node_dict.update(children=deserialize_nodelist(children))
+            node_type = types_index.get(node_kind, Node)
+            yield node_type.construct(**node_dict, kind=node_kind)  # type: ignore
+
+
 def load_nodes_types_from_module(module: Optional[ModuleType]) -> Iterator[NodeType]:
     for _, node_type in getmembers(module, _is_node_type):
         yield node_type

@@ -4,7 +4,13 @@ from typing import Any, Callable, Dict, Iterable, MutableSequence, Sequence, Set
 from pydantic import BaseModel, Field
 from pydantic.schema import schema
 
-from .nodes import AnyNode, NodeType, load_nodes_types_from_module, nodelist_to_html
+from .nodes import (
+    AnyNode,
+    NodeType,
+    deserialize_nodelist,
+    load_nodes_types_from_module,
+    nodelist_to_html,
+)
 
 DistillerError = ValueError
 DistillationResult = Tuple['DistilledObject', Sequence[DistillerError]]
@@ -14,7 +20,11 @@ class BaseDistiller:
     include: Set[str]
     exclude: Set[str]
     return_type: Type['DistilledObject']
-    registry: Set[NodeType]
+    registry: 'Registry'
+
+    class Registry(Set[NodeType]):
+        def indexed(self) -> Dict[str, NodeType]:
+            return {node_type.get_node_kind_value(): node_type for node_type in self}
 
     def __init__(
         self,
@@ -23,7 +33,7 @@ class BaseDistiller:
         include: Iterable[str] = None,
         exclude: Iterable[str] = None,
     ):
-        self.registry = set(load_nodes_types_from_module(types_module))
+        self.registry = self.Registry(load_nodes_types_from_module(types_module))
         self.return_type = return_type or DistilledObject
         assert issubclass(
             self.return_type, DistilledObject
@@ -39,6 +49,14 @@ class BaseDistiller:
     def schema(self, title: str = None, description: str = None) -> Dict[str, Any]:
         return schema(
             self.registry, title=title, description=description  # type: ignore
+        )
+
+    def deserialize(
+        self, nodes: Iterable[Dict[str, Any]], finalize_nodes: bool = False
+    ) -> 'DistilledObject':
+        deserialized = deserialize_nodelist(nodes, types_index=self.registry.indexed())
+        return DistilledObject.construct(
+            nodes=tuple(deserialized) if finalize_nodes else deserialized
         )
 
 
