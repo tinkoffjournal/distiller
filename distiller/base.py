@@ -11,6 +11,7 @@ from .nodes import (
     deserialize_nodelist,
     load_nodes_types_from_module,
     nodelist_to_html,
+    nodelist_to_plaintext,
 )
 
 DistillerError = ValueError
@@ -75,6 +76,9 @@ class DistilledObject(BaseModel):
         return nodelist_to_html(
             self.nodes, include=include, exclude=exclude, allowed_attrs=allowed_attrs
         )
+
+    def to_plaintext(self, delimiter: str = '\n\n') -> str:
+        return nodelist_to_plaintext(self.nodes, delimiter=delimiter)
 
     @property
     def _tasks(self) -> Iterable[Callable]:

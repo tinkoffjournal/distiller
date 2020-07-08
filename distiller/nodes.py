@@ -1,5 +1,6 @@
 from inspect import getmembers, isclass
 from io import StringIO
+from re import sub as re_sub
 from types import ModuleType
 from typing import (
     Any,
@@ -18,7 +19,7 @@ from typing import (
 
 from pydantic import BaseModel, Extra, Field, NoneStr, validator
 
-from .helpers import NodeKind, jsonify_node_value
+from .helpers import KNOWN_CONTAINER_KINDS, NodeKind, jsonify_node_value, normalize_whitespace
 
 RESERVED_NODE_ATTRS_NAMES = {'kind', 'children'}
 DEFAULT_NODE_SCHEMA_TITLE = 'Distilled node'
@@ -38,6 +39,9 @@ class BaseNode(BaseModel):
         return self.dict(**kwargs)
 
     def to_html(self, **kwargs: Any) -> str:
+        raise NotImplementedError  # pragma: no cover
+
+    def to_plaintext(self, **kwargs: Any) -> str:
         raise NotImplementedError  # pragma: no cover
 
 
@@ -109,6 +113,16 @@ class Node(BaseNode):
         return nodelist_to_html(
             self.children, include=include, exclude=exclude, allowed_attrs=allowed_attrs
         )
+
+    def to_plaintext(self, delimiter: str = ' ', **kwargs: Any) -> str:
+        return delimiter.join(self.get_text_chunks())
+
+    def get_text_chunks(self) -> Iterator[str]:
+        for subnode in self.children:
+            if isinstance(subnode, Node):
+                yield from subnode.get_text_chunks()
+            else:
+                yield subnode.to_plaintext()
 
     @classmethod
     def prepare_attrs(cls, attrs: Dict[str, Any]) -> Dict[str, Any]:
@@ -182,12 +196,18 @@ class InvalidNode(BaseNode):
     def to_html(self, **kwargs: Any) -> str:
         return f'<{self.kind} />'
 
+    def to_plaintext(self, **kwargs: Any) -> str:
+        return ''
+
 
 class TextNode(BaseNode):
     kind: NodeKind = Field(default=TEXT_NODE_KIND, const=True)
     content: str = Field(default='', title='Text node inner content')
 
     def to_html(self, **kwargs: Any) -> str:
+        return self.content
+
+    def to_plaintext(self, **kwargs: Any) -> str:
         return self.content
 
     @classmethod
@@ -212,6 +232,10 @@ AllowedAttrs = Mapping[str, Iterable[str]]
 Node.update_forward_refs()
 
 
+def node(kind: Union[NodeKind, str], *children: AnyNode, **attrs: Any) -> Node:
+    return Node(kind=kind, children=children, **attrs)  # type: ignore
+
+
 def text(content: str = '') -> TextNode:
     return TextNode(content=content)
 
@@ -225,12 +249,22 @@ def nodelist_to_html(
     include = include or set()
     exclude = exclude or set()
     with StringIO() as buff:
-        for node in nodelist:
-            if include and node.kind not in include or exclude and node.kind in exclude:
+        for n in nodelist:
+            if include and n.kind not in include or exclude and n.kind in exclude:
                 continue
-            html = node.to_html(include=include, exclude=exclude, allowed_attrs=allowed_attrs)
+            html = n.to_html(include=include, exclude=exclude, allowed_attrs=allowed_attrs)
             buff.write(html)
         return buff.getvalue()
+
+
+def nodelist_to_plaintext(nodelist: Iterable[AnyNode], delimiter: str = '\n\n') -> str:
+    chunks = map(
+        lambda n: n.to_plaintext(delimiter=delimiter if n.kind in KNOWN_CONTAINER_KINDS else ' '),
+        nodelist,
+    )
+    plaintext = delimiter.join(chunks)
+    plaintext = re_sub(rf'{delimiter}+', delimiter, plaintext)
+    return normalize_whitespace(plaintext)
 
 
 def deserialize_nodelist(

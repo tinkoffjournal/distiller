@@ -1,7 +1,7 @@
 from html import escape
 from inspect import getmodule, stack
 from json import dumps as json_dumps
-from re import compile as re_compile
+from re import UNICODE, compile as re_compile
 from types import ModuleType
 from typing import Any
 
@@ -12,6 +12,13 @@ from pydantic.validators import strict_str_validator
 CAMEL_CASE = re_compile(r'(?<!^)(?=[A-Z])')
 MULTI_NEWLINES = re_compile(r'\n+')
 MULTI_DASHES = re_compile(r'-+')
+MULTI_SPACES = re_compile(r' +')
+SOFTWRAPS = re_compile(r'[\u200c\u00ad]', UNICODE)
+HTML_BREAK_ENTITIES = ('&shy;', '&zwnj;')
+WHITESPACES = ('\N{NO-BREAK SPACE}', '&nbsp;')
+
+# Used to split lines correctly when converting nodelist to plaintext
+KNOWN_CONTAINER_KINDS = {'ul', 'ol', 'dl', 'div', 'table', 'tbody', 'section', 'header', 'footer'}
 
 
 class NodeKind(ConstrainedStr):
@@ -36,6 +43,15 @@ def camel_to_kebab_case(value: str) -> str:
 
 def glue_multi_newlines(markup: str) -> str:
     return MULTI_NEWLINES.sub('\n', markup)
+
+
+def normalize_whitespace(text: str) -> str:
+    text = SOFTWRAPS.sub('', text)
+    for html_entity in HTML_BREAK_ENTITIES:
+        text = text.replace(html_entity, '')
+    for special_space_char in WHITESPACES:
+        text = text.replace(special_space_char, ' ')
+    return MULTI_SPACES.sub(' ', text).strip()
 
 
 def current_module() -> ModuleType:
