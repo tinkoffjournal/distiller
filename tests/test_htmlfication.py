@@ -1,9 +1,11 @@
-from bs4 import BeautifulSoup
+from json import dumps as json_dumps
+
 from pydantic import BaseModel
 
 from distiller.base import DistilledObject
-from distiller.helpers import jsonify_node_value
 from distiller.nodes import INVALID_NODE_KIND, InvalidNode, Node, text
+
+from .helpers import make_soup
 
 
 class Bogus(BaseModel):
@@ -28,20 +30,15 @@ class SimpleNode(Node):
 test_node = CoolNode(bogus=Bogus())
 
 
-def test_single_node_html():
-    list_value = jsonify_node_value(test_node.items)
-    dict_value = jsonify_node_value(test_node.mapping)
-    nested_model_value = jsonify_node_value(test_node.bogus.dict())
-    html = (
-        f'<{test_node.kind} foo="bar" pax="42" items="{list_value}" '
-        f'mapping="{dict_value}" bogus="{nested_model_value}" this />'
-    )
-    assert test_node.to_html() == html
-
-
-def test_node_children_html():
-    node = SimpleNode(children=[test_node], this='that')
-    assert node.to_html() == f'<{node.kind} this="that">{test_node.to_html()}</{node.kind}>'
+def test_node_attrs_htmlfication():
+    tag = make_soup(test_node.to_html()).find(test_node.kind)
+    assert tag.name == test_node.kind
+    assert tag['pax'] == str(test_node.pax)
+    assert tag['this'] == ''
+    assert 'that' not in tag
+    assert tag['items'] == json_dumps(test_node.items, ensure_ascii=False)
+    assert tag['mapping'] == json_dumps(test_node.mapping, ensure_ascii=False)
+    assert tag['bogus'] == test_node.bogus.json()
 
 
 def test_mixed_nodes_structure():
@@ -75,13 +72,29 @@ def test_distilled_to_html_conditionals():
     )
     distilled.nodes = tuple(distilled.nodes)
     html_exc = distilled.to_html(exclude={simple.kind, 'foo'})
-    soup = BeautifulSoup(html_exc, features='lxml')
+    soup = make_soup(html_exc)
     assert len(soup.find_all(simple.kind)) == 0
     assert len(soup.find_all('foo')) == 0
     allowed_kinds = {test_node.kind, simple.kind}
     html_inc = distilled.to_html(include=allowed_kinds)
-    soup = BeautifulSoup(html_inc, features='lxml')
+    soup = make_soup(html_inc)
     found_kinds = set()
     for tag in soup.body.descendants:
         found_kinds.add(tag.name)
     assert allowed_kinds == found_kinds
+
+
+def test_strict_nodes_attrs():
+    distilled = DistilledObject(
+        nodes=[
+            test_node,
+            Node(kind='bar', children=[test_node]),
+            Node(kind='foo', rel='baz', name='other'),
+        ]
+    )
+    allowed_attrs = {'cool-node': {'pax', 'this'}, 'foo': {'rel'}}
+    html = distilled.to_html(allowed_attrs=allowed_attrs)
+    soup = make_soup(html)
+    for tag in soup.body.descendants:
+        allowed_tag_attrs = allowed_attrs.get(tag.name, set())
+        assert set(tag.attrs.keys()) == allowed_tag_attrs

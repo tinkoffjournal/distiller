@@ -7,6 +7,7 @@ from typing import (
     Dict,
     Iterable,
     Iterator,
+    Mapping,
     MutableSequence,
     NamedTuple,
     Optional,
@@ -65,9 +66,18 @@ class Node(BaseNode):
             serialized.update(children=tuple(children))
         return serialized
 
-    def to_html(self, include: Set[str] = None, exclude: Set[str] = None, **kwargs: Any) -> str:
-        serialized = self.dict(exclude={'children'})
-        tagname = serialized.pop('kind', None)
+    def to_html(
+        self,
+        include: Set[str] = None,
+        exclude: Set[str] = None,
+        allowed_attrs: 'AllowedAttrs' = None,
+        **kwargs: Any,
+    ) -> str:
+        self_allowed_attrs = None
+        if allowed_attrs is not None:
+            self_allowed_attrs = set(allowed_attrs.get(self.kind, ()))
+        serialized = self.dict(exclude={'children'}, include=self_allowed_attrs)
+        tagname = self.kind
         if not tagname:
             return ''
         attrs_map = {}
@@ -84,12 +94,21 @@ class Node(BaseNode):
         if positional_attrs:
             attrs = f'{attrs} {" ".join(positional_attrs)}'
         if self.children:
-            inner_html = self.get_inner_html(include=include, exclude=exclude)
+            inner_html = self.get_inner_html(
+                include=include, exclude=exclude, allowed_attrs=allowed_attrs
+            )
             return f'<{tagname}{attrs}>{inner_html}</{tagname}>'
         return f'<{tagname}{attrs} />'
 
-    def get_inner_html(self, include: Set[str] = None, exclude: Set[str] = None) -> str:
-        return nodelist_to_html(self.children, include=include, exclude=exclude)
+    def get_inner_html(
+        self,
+        include: Set[str] = None,
+        exclude: Set[str] = None,
+        allowed_attrs: 'AllowedAttrs' = None,
+    ) -> str:
+        return nodelist_to_html(
+            self.children, include=include, exclude=exclude, allowed_attrs=allowed_attrs
+        )
 
     @classmethod
     def prepare_attrs(cls, attrs: Dict[str, Any]) -> Dict[str, Any]:
@@ -189,6 +208,7 @@ class TextNode(BaseNode):
 AnyNode = Union[TextNode, Node, InvalidNode]
 NodeChildren = MutableSequence[AnyNode]
 NodeType = Type[Node]
+AllowedAttrs = Mapping[str, Iterable[str]]
 Node.update_forward_refs()
 
 
@@ -197,7 +217,10 @@ def text(content: str = '') -> TextNode:
 
 
 def nodelist_to_html(
-    nodelist: Iterable[AnyNode], include: Set[str] = None, exclude: Set[str] = None
+    nodelist: Iterable[AnyNode],
+    include: Set[str] = None,
+    exclude: Set[str] = None,
+    allowed_attrs: AllowedAttrs = None,
 ) -> str:
     include = include or set()
     exclude = exclude or set()
@@ -205,7 +228,8 @@ def nodelist_to_html(
         for node in nodelist:
             if include and node.kind not in include or exclude and node.kind in exclude:
                 continue
-            buff.write(node.to_html(include=include, exclude=exclude))
+            html = node.to_html(include=include, exclude=exclude, allowed_attrs=allowed_attrs)
+            buff.write(html)
         return buff.getvalue()
 
 
