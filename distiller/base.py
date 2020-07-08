@@ -68,8 +68,8 @@ class DistilledObject(BaseModel):
         nodes = tuple(node.serialize(**kwargs) for node in self.nodes)
         return {**serialized, 'nodes': nodes}
 
-    def to_html(self) -> str:
-        return nodelist_to_html(self.nodes)
+    def to_html(self, include: Set[str] = None, exclude: Set[str] = None) -> str:
+        return nodelist_to_html(self.nodes, include=include, exclude=exclude)
 
     @property
     def _tasks(self) -> Iterable[Callable]:

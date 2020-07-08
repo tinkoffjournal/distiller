@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from pydantic import BaseModel
 
 from distiller.base import DistilledObject
@@ -31,10 +32,11 @@ def test_single_node_html():
     list_value = jsonify_node_value(test_node.items)
     dict_value = jsonify_node_value(test_node.mapping)
     nested_model_value = jsonify_node_value(test_node.bogus.dict())
-    assert (
-        test_node.to_html()
-        == f'<{test_node.kind} foo="bar" pax="42" items="{list_value}" mapping="{dict_value}" bogus="{nested_model_value}" this />'
+    html = (
+        f'<{test_node.kind} foo="bar" pax="42" items="{list_value}" '
+        f'mapping="{dict_value}" bogus="{nested_model_value}" this />'
     )
+    assert test_node.to_html() == html
 
 
 def test_node_children_html():
@@ -58,3 +60,28 @@ def test_invalid_node_html():
     node = SimpleNode(this='other')
     node.kind = ''
     assert node.to_html() == ''
+
+
+def test_distilled_to_html_conditionals():
+    simple = SimpleNode(this='this')
+    distilled = DistilledObject(
+        nodes=[
+            test_node,
+            SimpleNode(this='this'),
+            Node(kind='bar', children=[SimpleNode(this='that')]),
+            test_node,
+            Node(kind='foo'),
+        ]
+    )
+    distilled.nodes = tuple(distilled.nodes)
+    html_exc = distilled.to_html(exclude={simple.kind, 'foo'})
+    soup = BeautifulSoup(html_exc, features='lxml')
+    assert len(soup.find_all(simple.kind)) == 0
+    assert len(soup.find_all('foo')) == 0
+    allowed_kinds = {test_node.kind, simple.kind}
+    html_inc = distilled.to_html(include=allowed_kinds)
+    soup = BeautifulSoup(html_inc, features='lxml')
+    found_kinds = set()
+    for tag in soup.body.descendants:
+        found_kinds.add(tag.name)
+    assert allowed_kinds == found_kinds

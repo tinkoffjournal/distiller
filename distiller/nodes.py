@@ -10,6 +10,7 @@ from typing import (
     MutableSequence,
     NamedTuple,
     Optional,
+    Set,
     Type,
     Union,
 )
@@ -35,7 +36,7 @@ class BaseNode(BaseModel):
     def serialize(self, **kwargs: Any) -> Any:
         return self.dict(**kwargs)
 
-    def to_html(self) -> str:
+    def to_html(self, **kwargs: Any) -> str:
         raise NotImplementedError  # pragma: no cover
 
 
@@ -51,6 +52,10 @@ class Node(BaseNode):
             return NodeKind(value)
         return cls.get_node_kind_value()
 
+    @classmethod
+    def get_node_kind_value(cls) -> NodeKind:
+        return NodeKind(cls.__name__)
+
     def serialize(self, **kwargs: Any) -> Dict[str, Any]:
         exclude = kwargs.get('exclude') or set()
         kwargs.update(exclude=exclude.union({'children'}))
@@ -60,7 +65,7 @@ class Node(BaseNode):
             serialized.update(children=tuple(children))
         return serialized
 
-    def to_html(self) -> str:
+    def to_html(self, include: Set[str] = None, exclude: Set[str] = None, **kwargs: Any) -> str:
         serialized = self.dict(exclude={'children'})
         tagname = serialized.pop('kind', None)
         if not tagname:
@@ -79,12 +84,12 @@ class Node(BaseNode):
         if positional_attrs:
             attrs = f'{attrs} {" ".join(positional_attrs)}'
         if self.children:
-            return f'<{tagname}{attrs}>{nodelist_to_html(self.children)}</{tagname}>'
+            inner_html = self.get_inner_html(include=include, exclude=exclude)
+            return f'<{tagname}{attrs}>{inner_html}</{tagname}>'
         return f'<{tagname}{attrs} />'
 
-    @classmethod
-    def get_node_kind_value(cls) -> NodeKind:
-        return NodeKind(cls.__name__)
+    def get_inner_html(self, include: Set[str] = None, exclude: Set[str] = None) -> str:
+        return nodelist_to_html(self.children, include=include, exclude=exclude)
 
     @classmethod
     def prepare_attrs(cls, attrs: Dict[str, Any]) -> Dict[str, Any]:
@@ -155,7 +160,7 @@ class InvalidNode(BaseNode):
     kind: NodeKind = Field(default=INVALID_NODE_KIND, const=True)
     tagname: str = Field(title='Original node tag name')
 
-    def to_html(self) -> str:
+    def to_html(self, **kwargs: Any) -> str:
         return f'<{self.kind} />'
 
 
@@ -163,7 +168,7 @@ class TextNode(BaseNode):
     kind: NodeKind = Field(default=TEXT_NODE_KIND, const=True)
     content: str = Field(default='', title='Text node inner content')
 
-    def to_html(self) -> str:
+    def to_html(self, **kwargs: Any) -> str:
         return self.content
 
     @classmethod
@@ -191,10 +196,16 @@ def text(content: str = '') -> TextNode:
     return TextNode(content=content)
 
 
-def nodelist_to_html(nodelist: Iterable[AnyNode]) -> str:
+def nodelist_to_html(
+    nodelist: Iterable[AnyNode], include: Set[str] = None, exclude: Set[str] = None
+) -> str:
+    include = include or set()
+    exclude = exclude or set()
     with StringIO() as buff:
         for node in nodelist:
-            buff.write(node.to_html())
+            if include and node.kind not in include or exclude and node.kind in exclude:
+                continue
+            buff.write(node.to_html(include=include, exclude=exclude))
         return buff.getvalue()
 
 

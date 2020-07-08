@@ -1,3 +1,4 @@
+from html import escape
 from inspect import getmodule, stack
 from json import dumps as json_dumps
 from re import compile as re_compile
@@ -44,5 +45,5 @@ def current_module() -> ModuleType:
 
 def jsonify_node_value(value: Any) -> str:
     jsonified = json_dumps(value, ensure_ascii=False)
-    jsonified = jsonified.replace('"', '\\"').replace('\n', '\\n')
+    jsonified = escape(jsonified.replace('\n', '\\n'))
     return jsonified
