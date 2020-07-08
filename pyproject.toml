@@ -40,7 +40,7 @@ test = [
   "pytest-cov",
   "mypy",
   "black",
-  "isort",
+  "isort > 5",
   "faker",
   "flake8",
 ]

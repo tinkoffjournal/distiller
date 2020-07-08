@@ -1,15 +1,15 @@
-.DEFAULT_GOAL := fmt
+.DEFAULT_GOAL := format
 DIR = distiller
 
-fmt:
-	isort --recursive $(DIR)
+format:
+	isort $(DIR)
 	black $(DIR)
 
 type:
 	mypy $(DIR)
 
 lint:
-	isort --recursive --check-only --diff $(DIR)
+	isort --check-only --diff $(DIR)
 	black --check $(DIR)
 	flake8 $(DIR)
 
