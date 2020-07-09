@@ -22,7 +22,7 @@ KNOWN_CONTAINER_KINDS = {'ul', 'ol', 'dl', 'div', 'table', 'tbody', 'section', '
 
 
 class NodeKind(ConstrainedStr):
-    regex = re_compile(r'(^[a-z]+$)|(^[a-z][a-z-]+[a-z]$)')
+    regex = re_compile(r'(^[a-z]+[a-z\d]?$)|(^[a-z][a-z-]+[a-z\d]$)')
     strip_whitespace = True
 
     def __new__(cls, value: str):  # type: ignore

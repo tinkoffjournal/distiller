@@ -23,6 +23,7 @@ class BaseDistiller:
     exclude: Set[str]
     return_type: Type['DistilledObject']
     registry: 'Registry'
+    context: Dict[str, Any]
 
     class Registry(Set[NodeType]):
         def indexed(self) -> Dict[str, NodeType]:
@@ -34,6 +35,7 @@ class BaseDistiller:
         return_type: Type['DistilledObject'] = None,
         include: Iterable[str] = None,
         exclude: Iterable[str] = None,
+        context: Dict[str, Any] = None,
     ):
         self.registry = self.Registry(load_nodes_types_from_module(types_module))
         self.return_type = return_type or DistilledObject
@@ -42,6 +44,7 @@ class BaseDistiller:
         ), 'Distiller return type must be subclassed from DistilledObject'
         self.include = set(include or ())
         self.exclude = set(exclude or ())
+        self.context = context or {}
 
     def __call__(
         self, source: Any, context: Dict[str, Any] = None, raise_validation_error: bool = False,

@@ -1,6 +1,6 @@
 """HTML/JSON documents parser into Pydantic models"""
 
-__version__ = '0.1.0b1'
+__version__ = '0.1.0b2'
 
 from pydantic import ValidationError
 

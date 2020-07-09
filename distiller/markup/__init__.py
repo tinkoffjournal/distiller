@@ -54,7 +54,7 @@ class MarkupDistiller(BaseDistiller):
         parser_instance = MarkupParser(
             markup,
             mapper=self.types_mapper,
-            context=context,
+            context={**self.context, **(context or {})},
             include=self.include,
             exclude=self.exclude,
             raise_validation_error=raise_validation_error,

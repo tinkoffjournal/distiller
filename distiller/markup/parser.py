@@ -88,8 +88,8 @@ class MarkupParser:
 class TreeBuilder(LXMLTreeBuilder):
     mapper: NodeTypesMapper
     context: dict
-    include: Set[str]
-    exclude: Set[str]
+    disallowed_nodes: Set[str]
+    allowed_nodes: Set[str]
     errors: List[MarkupParserError]
     raise_validation_error: bool
     nodetasks: Optional[MutableSequence]
@@ -100,8 +100,8 @@ class TreeBuilder(LXMLTreeBuilder):
         *args: Any,
         mapper: NodeTypesMapper = None,
         context: dict = None,
-        include: Set[str] = None,
         exclude: Set[str] = None,
+        include: Set[str] = None,
         raise_validation_error: bool = False,
         nodetasks: MutableSequence = None,
         nodestack: MutableSequence = None,
@@ -110,8 +110,11 @@ class TreeBuilder(LXMLTreeBuilder):
         super().__init__(*args, **kwargs)
         self.mapper = mapper or NodeTypesMapper()
         self.context = context or {}
-        self.include = include or set()
-        self.exclude = exclude or set()
+        self.disallowed_nodes = exclude or set()
+        if include:
+            self.allowed_nodes = include - self.disallowed_nodes | {'html', 'body'}
+        else:
+            self.allowed_nodes = set()
         self.raise_validation_error = raise_validation_error
         self.errors = []
         self.nodetasks = nodetasks
@@ -120,22 +123,22 @@ class TreeBuilder(LXMLTreeBuilder):
     def parser_for(self, *args: Any, **kwargs: Any) -> HTMLParser:
         return HTMLParser(target=self, strip_cdata=False, recover=True, remove_comments=True)
 
-    def skip_node(self, node_name: str) -> bool:
-        return self.include and node_name not in self.include or node_name in self.exclude
-
     def create_node_from_tag(self, tag: 'TagNode', node_type: NodeType = None) -> ParsedNode:
+        # Use tag name as node kind value by default,
+        # find declared schema class, skip processing if node kind disallowed
         node_kind = tag.name
-        if self.skip_node(node_kind):
-            return None
-
         node_type = node_type or self.mapper.find_tag_node_type(tag)
+        if node_type != self.mapper.default_node_type:
+            node_kind = node_type.get_node_kind_value()
+        if (
+            node_kind in self.disallowed_nodes
+            or self.allowed_nodes
+            and node_kind not in self.allowed_nodes
+        ):
+            return None
 
         # Get & transform tag attributes
         node_attrs = node_type.prepare_attrs(tag.attrs)
-        if node_type != self.mapper.default_node_type:
-            node_kind = node_type.get_node_kind_value()
-            if self.skip_node(node_kind):
-                return None
 
         # Create node from class, collect/raise error
         try:
@@ -143,7 +146,7 @@ class TreeBuilder(LXMLTreeBuilder):
         except ValidationError as exc:
             if self.raise_validation_error:
                 raise exc
-            self.errors.append(MarkupParserError(reason=exc, context=str(self)))
+            self.errors.append(MarkupParserError(reason=exc, context=str(tag)))
             return InvalidNode(tagname=node_kind, **node_attrs)
 
         # Pass outer context
@@ -221,8 +224,7 @@ class TagNode(Tag):
     @property
     def parent_node(self) -> ParsedNode:
         parent_tag: TagNode = self.parent
-        if parent_tag and parent_tag.name != 'body':
-            return parent_tag.node
+        return parent_tag.node if parent_tag and parent_tag.name != 'body' else None
 
 
 class StringNode(NavigableString):
