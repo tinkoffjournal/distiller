@@ -245,9 +245,13 @@ def nodelist_to_html(
     include: Set[str] = None,
     exclude: Set[str] = None,
     allowed_attrs: AllowedAttrs = None,
+    exclude_invalid: bool = True,
 ) -> str:
     include = include or set()
+    include.add(TEXT_NODE_KIND)
     exclude = exclude or set()
+    if exclude_invalid:
+        exclude.add(INVALID_NODE_KIND)
     with StringIO() as buff:
         for n in nodelist:
             if include and n.kind not in include or exclude and n.kind in exclude:
@@ -268,9 +272,12 @@ def nodelist_to_plaintext(nodelist: Iterable[AnyNode], delimiter: str = '\n\n') 
 
 
 def deserialize_nodelist(
-    nodelist: Iterable[Dict[str, Any]], types_index: Dict[str, NodeType] = None
+    nodelist: Iterable[Dict[str, Any]],
+    types_index: Dict[str, NodeType] = None,
+    context: Dict[str, Any] = None,
 ) -> Iterator[AnyNode]:
     types_index = types_index or {}
+    context = context or {}
     for node_dict in nodelist:
         node_dict = node_dict.copy()
         node_kind = node_dict.pop('kind', None)
@@ -285,11 +292,16 @@ def deserialize_nodelist(
             if tagname:
                 yield InvalidNode.construct(**node_dict, tagname=tagname)  # type: ignore
         else:
-            children = node_dict.get('children')
-            if children:
-                node_dict.update(children=deserialize_nodelist(children))
             node_type = types_index.get(node_kind, Node)
-            yield node_type.construct(**node_dict, kind=node_kind)  # type: ignore
+            node_parent = context.pop('parent', None)
+            node_children = node_dict.pop('children', [])
+            node_obj = node_type.construct(**node_dict, kind=node_kind)  # type: ignore
+            node_obj.update_context(parent=node_parent, **context)
+            if node_children:
+                node_obj.children = deserialize_nodelist(  # type: ignore
+                    node_children, context={'parent': node_obj, **context}
+                )
+            yield node_obj
 
 
 def load_nodes_types_from_module(module: Optional[ModuleType]) -> Iterator[NodeType]:

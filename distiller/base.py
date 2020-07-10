@@ -57,9 +57,14 @@ class BaseDistiller:
         )
 
     def deserialize(
-        self, nodes: Iterable[Dict[str, Any]], finalize_nodes: bool = False
+        self,
+        nodes: Iterable[Dict[str, Any]],
+        finalize_nodes: bool = False,
+        context: Dict[str, Any] = None,
     ) -> 'DistilledObject':
-        deserialized = deserialize_nodelist(nodes, types_index=self.registry.indexed())
+        deserialized = deserialize_nodelist(
+            nodes, types_index=self.registry.indexed(), context=context
+        )
         return DistilledObject.construct(
             nodes=tuple(deserialized) if finalize_nodes else deserialized
         )
