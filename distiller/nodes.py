@@ -317,7 +317,7 @@ def deserialize_nodelist(
             node_obj.update_context(parent=node_parent, **context)
             if node_children:
                 node_obj.children = deserialize_nodelist(  # type: ignore
-                    node_children, context={'parent': node_obj, **context}
+                    node_children, context={'parent': node_obj, **context}, types_index=types_index
                 )
             yield node_obj
 
