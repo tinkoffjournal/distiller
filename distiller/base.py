@@ -79,14 +79,26 @@ class DistilledObject(BaseModel):
         return {**serialized, 'nodes': nodes}
 
     def to_html(
-        self, include: Set[str] = None, exclude: Set[str] = None, allowed_attrs: AllowedAttrs = None
+        self,
+        include: Set[str] = None,
+        exclude: Set[str] = None,
+        exclude_invalid: bool = True,
+        allowed_attrs: AllowedAttrs = None,
     ) -> str:
         return nodelist_to_html(
-            self.nodes, include=include, exclude=exclude, allowed_attrs=allowed_attrs
+            self.nodes,
+            include=include,
+            exclude=exclude,
+            exclude_invalid=exclude_invalid,
+            allowed_attrs=allowed_attrs,
         )
 
-    def to_plaintext(self, delimiter: str = '\n\n') -> str:
-        return nodelist_to_plaintext(self.nodes, delimiter=delimiter)
+    def to_plaintext(
+        self, delimiter: str = '\n\n', include: Set[str] = None, exclude: Set[str] = None,
+    ) -> str:
+        return nodelist_to_plaintext(
+            self.nodes, delimiter=delimiter, include=include, exclude=exclude
+        )
 
     @property
     def _tasks(self) -> Iterable[Callable]:

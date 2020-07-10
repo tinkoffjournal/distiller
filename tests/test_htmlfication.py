@@ -44,7 +44,9 @@ def test_node_attrs_htmlfication():
 def test_mixed_nodes_structure():
     text_content = 'bogus'
     distilled = DistilledObject(nodes=[test_node, text(text_content), InvalidNode(tagname='some')])
-    assert distilled.to_html() == test_node.to_html() + text_content + f'<{INVALID_NODE_KIND} />'
+    distilled.nodes = tuple(distilled.nodes)
+    assert distilled.to_html(exclude_invalid=False) == test_node.to_html() + text_content + f'<{INVALID_NODE_KIND} />'
+    assert distilled.to_html(exclude_invalid=True) == test_node.to_html() + text_content
 
 
 def test_distilled_object_html():

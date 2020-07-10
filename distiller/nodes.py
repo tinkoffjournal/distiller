@@ -114,11 +114,19 @@ class Node(BaseNode):
             self.children, include=include, exclude=exclude, allowed_attrs=allowed_attrs
         )
 
-    def to_plaintext(self, delimiter: str = ' ', **kwargs: Any) -> str:
-        return delimiter.join(self.get_text_chunks())
+    def to_plaintext(
+        self,
+        delimiter: str = ' ',
+        include: Set[str] = None,
+        exclude: Set[str] = None,
+        **kwargs: Any,
+    ) -> str:
+        return delimiter.join(self.get_text_chunks(include=include, exclude=exclude))
 
-    def get_text_chunks(self) -> Iterator[str]:
+    def get_text_chunks(self, include: Set[str] = None, exclude: Set[str] = None) -> Iterator[str]:
         for subnode in self.children:
+            if exclude and subnode.kind in exclude or include and subnode.kind not in include:
+                continue
             if isinstance(subnode, Node):
                 yield from subnode.get_text_chunks()
             else:
@@ -244,14 +252,13 @@ def nodelist_to_html(
     nodelist: Iterable[AnyNode],
     include: Set[str] = None,
     exclude: Set[str] = None,
-    allowed_attrs: AllowedAttrs = None,
     exclude_invalid: bool = True,
+    allowed_attrs: AllowedAttrs = None,
 ) -> str:
-    include = include or set()
-    include.add(TEXT_NODE_KIND)
+    include = include | {TEXT_NODE_KIND} if include else set()
     exclude = exclude or set()
     if exclude_invalid:
-        exclude.add(INVALID_NODE_KIND)
+        exclude = exclude | {INVALID_NODE_KIND}
     with StringIO() as buff:
         for n in nodelist:
             if include and n.kind not in include or exclude and n.kind in exclude:
@@ -261,9 +268,20 @@ def nodelist_to_html(
         return buff.getvalue()
 
 
-def nodelist_to_plaintext(nodelist: Iterable[AnyNode], delimiter: str = '\n\n') -> str:
+def nodelist_to_plaintext(
+    nodelist: Iterable[AnyNode],
+    delimiter: str = '\n\n',
+    include: Set[str] = None,
+    exclude: Set[str] = None,
+) -> str:
+    include = include | {TEXT_NODE_KIND} if include else set()
+    exclude = exclude or set()
     chunks = map(
-        lambda n: n.to_plaintext(delimiter=delimiter if n.kind in KNOWN_CONTAINER_KINDS else ' '),
+        lambda n: n.to_plaintext(
+            delimiter=delimiter if n.kind in KNOWN_CONTAINER_KINDS else ' ',
+            include=include,
+            exclude=exclude,
+        ),
         nodelist,
     )
     plaintext = delimiter.join(chunks)
