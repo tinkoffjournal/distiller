@@ -1,5 +1,18 @@
 from types import ModuleType
-from typing import Any, Callable, Dict, Iterable, MutableSequence, Sequence, Set, Tuple, Type
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    MutableSequence,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+)
 
 from pydantic import BaseModel, Field
 from pydantic.schema import schema
@@ -104,9 +117,36 @@ class DistilledObject(BaseModel):
     def _tasks(self) -> Iterable[Callable]:
         return filter(callable, self._State.tasks)
 
-    def __call__(self) -> None:
+    def collect_tasks(self, nodes: Iterable[AnyNode] = None) -> None:
+        for node in nodes or self.nodes:
+            task = getattr(node, 'post_init_method', None)
+            if task:
+                self._State.tasks.append(task)
+            subnodes = getattr(node, 'children', [])
+            if subnodes:
+                self.collect_tasks(subnodes)
+
+    def run_tasks(self) -> Iterator[Any]:
         for task in self._tasks:
-            task()
+            result = task()
+            if result:
+                yield result
+
+    def finalize(self) -> None:
+        for _ in self.run_tasks():
+            pass
+        self._State.finalized = True
+
+    async def run_tasks_async(self) -> AsyncIterator[Any]:
+        for task_result in self.run_tasks():
+            if isinstance(task_result, Awaitable):
+                task_result = await task_result
+            if task_result:
+                yield task_result
+
+    async def finalize_async(self) -> None:
+        async for _ in self.run_tasks_async():
+            pass
         self._State.finalized = True
 
     class Config:
