@@ -219,8 +219,10 @@ class TextNode(BaseNode):
         return self.content
 
     @classmethod
-    def create(cls, content: str) -> 'TextNode':
-        return cls(content=content.strip('\n'))
+    def create(cls, content: str, strip: bool = False) -> 'TextNode':
+        if strip:
+            content = content.strip('\n')
+        return cls(content=content)
 
     class Config:
         title = 'Text node'
@@ -302,7 +304,7 @@ def deserialize_nodelist(
         if not node_kind:
             continue
         if node_kind == TEXT_NODE_KIND:
-            content = node_dict.get('content')
+            content = node_dict.get('content', '').strip('\n')
             if content:
                 yield TextNode.construct(content=content)
         elif node_kind == INVALID_NODE_KIND:

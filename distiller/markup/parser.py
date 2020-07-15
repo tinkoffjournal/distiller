@@ -232,7 +232,7 @@ class StringNode(NavigableString):
 
     def __new__(cls, value: str):  # type: ignore
         string = super().__new__(cls, value)
-        string.node = TextNode.create(value) if value != '\n' else None
+        string.node = TextNode.create(value)
         return string
 
 
