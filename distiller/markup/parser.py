@@ -64,7 +64,9 @@ class MarkupParser:
             nodestack=self.nodestack,
         )
         self.soup = BeautifulSoup(
-            markup=markup, builder=self.builder, element_classes=_ELEMENT_CLASSES,
+            markup=markup,
+            builder=self.builder,
+            element_classes=_ELEMENT_CLASSES,
         )
         body: TagNode = self.soup.body
         if not body:
@@ -202,8 +204,9 @@ class TagContents(deque):
         self.ref = ref
 
     def append(self, el: Union['TagNode', 'StringNode']) -> None:
-        if el.node and isinstance(self.ref, Node):
-            self.ref.children.append(el.node)
+        child_node = getattr(el, 'node', None)
+        if isinstance(child_node, (Node, TextNode)) and isinstance(self.ref, Node):
+            self.ref.children.append(child_node)
         super().append(el)
 
 
@@ -212,7 +215,11 @@ class TagNode(Tag):
     contents: TagContents
 
     def __init__(
-        self, parser: HTMLParser = None, builder: TreeBuilder = None, *args: Any, **kwargs: Any,
+        self,
+        parser: HTMLParser = None,
+        builder: TreeBuilder = None,
+        *args: Any,
+        **kwargs: Any,
     ):
         builder = builder or TreeBuilder()
         super().__init__(parser, builder, *args, **kwargs)
@@ -236,4 +243,5 @@ class StringNode(NavigableString):
         return string
 
 
+# TODO: Stylesheet type is handled as Tag, resolve it
 _ELEMENT_CLASSES = {Tag: TagNode, NavigableString: StringNode}

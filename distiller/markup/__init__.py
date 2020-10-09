@@ -47,7 +47,10 @@ class MarkupDistiller(BaseDistiller):
         self.postprocessors = tuple(postprocessors or ())
 
     def __call__(
-        self, source: str, context: Dict[str, Any] = None, raise_validation_error: bool = False,
+        self,
+        source: str,
+        context: Dict[str, Any] = None,
+        raise_validation_error: bool = False,
     ) -> DistillationResult:
         obj = self.return_type()
         markup = self.preprocess(source) if source else ''

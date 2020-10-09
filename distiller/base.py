@@ -60,14 +60,15 @@ class BaseDistiller:
         self.context = context or {}
 
     def __call__(
-        self, source: Any, context: Dict[str, Any] = None, raise_validation_error: bool = False,
+        self,
+        source: Any,
+        context: Dict[str, Any] = None,
+        raise_validation_error: bool = False,
     ) -> DistillationResult:
         ...  # pragma: no cover
 
     def schema(self, title: str = None, description: str = None) -> Dict[str, Any]:
-        return schema(
-            self.registry, title=title, description=description  # type: ignore
-        )
+        return schema(self.registry, title=title, description=description)  # type: ignore
 
     def deserialize(
         self,
@@ -107,7 +108,10 @@ class DistilledObject(BaseModel):
         )
 
     def to_plaintext(
-        self, delimiter: str = '\n\n', include: Set[str] = None, exclude: Set[str] = None,
+        self,
+        delimiter: str = '\n\n',
+        include: Set[str] = None,
+        exclude: Set[str] = None,
     ) -> str:
         return nodelist_to_plaintext(
             self.nodes, delimiter=delimiter, include=include, exclude=exclude
