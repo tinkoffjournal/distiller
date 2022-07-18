@@ -5,6 +5,7 @@ build-backend = "flit_core.buildapi"
 [tool.flit.metadata]
 module = "distiller"
 dist-name = "pydantic-distiller"
+version = "0.2.4"
 author = "Arseny Gabdullin"
 author-email = "a.gabdullin@tinkoff.ru"
 home-page = "https://github.com/tinkoffjournal/distiller"
