@@ -330,4 +330,7 @@ def load_nodes_types_from_module(module: Optional[ModuleType]) -> Iterator[NodeT
 
 
 def _is_node_type(obj: Any) -> bool:
-    return isclass(obj) and issubclass(obj, Node) and obj is not Node
+    try:
+        return isclass(obj) and issubclass(obj, Node) and obj is not Node
+    except TypeError:
+        return False
