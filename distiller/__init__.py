@@ -1,7 +1,5 @@
 """HTML/JSON documents parser into Pydantic models"""
 
-__version__ = '0.1.0b7'
-
 from pydantic import ValidationError
 
 from .base import DistilledObject as Distilled, UnsupportedMarkupDistiller

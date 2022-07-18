@@ -66,7 +66,7 @@ class Node(BaseNode):
         kwargs.update(exclude=exclude.union({'children'}))
         serialized: dict = self.dict(**kwargs)
         if self.children:
-            children = map(lambda child: child.serialize(**kwargs), self.children)
+            children = serialize_nodelist(self.children, **kwargs)
             serialized.update(children=tuple(children))
         return serialized
 
@@ -289,6 +289,13 @@ def nodelist_to_plaintext(
     plaintext = delimiter.join(chunks)
     plaintext = re_sub(rf'{delimiter}+', delimiter, plaintext)
     return normalize_whitespace(plaintext)
+
+
+def serialize_nodelist(nodelist: Iterable[AnyNode], **kwargs: Any) -> Iterator[Dict[str, Any]]:
+    for node_ in nodelist:
+        if node_.kind == 'text' and node_.content in ('', '\n'):  # type: ignore
+            continue
+        yield node_.serialize(**kwargs)
 
 
 def deserialize_nodelist(

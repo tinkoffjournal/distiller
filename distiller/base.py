@@ -25,6 +25,7 @@ from .nodes import (
     load_nodes_types_from_module,
     nodelist_to_html,
     nodelist_to_plaintext,
+    serialize_nodelist,
 )
 
 DistillerError = ValueError
@@ -75,12 +76,13 @@ class BaseDistiller:
         nodes: Iterable[Dict[str, Any]],
         finalize_nodes: bool = False,
         context: Dict[str, Any] = None,
+        **values: Any,
     ) -> 'DistilledObject':
         deserialized = deserialize_nodelist(
             nodes, types_index=self.registry.indexed(), context=context
         )
-        return DistilledObject.construct(
-            nodes=tuple(deserialized) if finalize_nodes else deserialized
+        return self.return_type.construct(
+            nodes=tuple(deserialized) if finalize_nodes else deserialized, **values
         )
 
 
@@ -89,8 +91,8 @@ class DistilledObject(BaseModel):
 
     def serialize(self, **kwargs: Any) -> Dict[str, Any]:
         serialized = self.dict(exclude={'nodes'})
-        nodes = tuple(node.serialize(**kwargs) for node in self.nodes)
-        return {**serialized, 'nodes': nodes}
+        nodes = serialize_nodelist(self.nodes, **kwargs)
+        return {**serialized, 'nodes': tuple(nodes)}
 
     def to_html(
         self,
