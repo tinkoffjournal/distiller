@@ -1,9 +1,25 @@
+### PyCharm ###
+# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm
+# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+
+# User-specific stuff
+/.idea
+/.code
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+*.pyc
+
+# Distribution / packaging
 dist/
-venv/
+
+# Unit test / coverage reports
 .mypy_cache/
 .pytest_cache/
 .coverage
 coverage.xml
 htmlcov/
 tests/data/
-*.pyc
+
+# Environments
+venv/
