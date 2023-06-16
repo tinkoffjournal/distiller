@@ -6,6 +6,9 @@
 /.idea
 /.code
 
+### VSCode ###
+/.vscode
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 *.pyc
@@ -23,3 +26,4 @@ tests/data/
 
 # Environments
 venv/
+.python-version
