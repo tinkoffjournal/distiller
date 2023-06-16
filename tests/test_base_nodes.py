@@ -56,6 +56,19 @@ def test_node_context():
     assert lead.context.data['foo'] == 'bar'
 
 
+def test_node_switch_context():
+    first_lead = Lead()
+    second_lead = Lead()
+
+    first_lead.update_context(foo='foo')
+    second_lead.update_context(bar='bar')
+
+    assert first_lead.context.data.get('foo') == 'foo'
+    assert first_lead.context.data.get('bar') is None
+    assert second_lead.context.data.get('foo') is None
+    assert second_lead.context.data.get('bar') == 'bar'
+
+
 def test_node_schema():
     schema = Lead.schema()
     assert schema['title'] == Lead.__name__

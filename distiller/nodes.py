@@ -17,7 +17,7 @@ from typing import (
     Union,
 )
 
-from pydantic import BaseModel, Extra, Field, NoneStr, validator
+from pydantic import BaseModel, Extra, Field, NoneStr, PrivateAttr, validator
 
 from .helpers import KNOWN_CONTAINER_KINDS, NodeKind, jsonify_node_value, normalize_whitespace
 
@@ -30,6 +30,10 @@ INVALID_NODE_KIND = NodeKind('invalid-node')
 class NodeContext(NamedTuple):
     parent: Optional['Node'] = None
     data: Dict[str, Any] = {}
+
+
+class State(BaseModel):
+    context: NodeContext = Field(default_factory=NodeContext)
 
 
 class BaseNode(BaseModel):
@@ -48,6 +52,8 @@ class BaseNode(BaseModel):
 class Node(BaseNode):
     kind: NodeKind = Field(default=None, title='Distilled node kind')
     children: 'NodeChildren' = Field(default=[], title='Distilled subnodes')
+
+    _state: State = PrivateAttr(default_factory=State)
 
     # Custom kind value may be set only for base nodes without specific schema,
     # otherwise class name is used
@@ -163,18 +169,15 @@ class Node(BaseNode):
 
     @property
     def context(self) -> NodeContext:
-        return self._State.context
+        return self._state.context
 
     def update_context(self, parent: 'Node' = None, **kwargs: Any) -> NodeContext:
         ctx = NodeContext(
-            parent=parent or self._State.context.parent,
-            data={**self._State.context.data, **kwargs},
+            parent=parent or self._state.context.parent,
+            data={**self._state.context.data, **kwargs},
         )
-        self._State.context = ctx
+        self._state.context = ctx
         return ctx
-
-    class _State:
-        context: NodeContext = NodeContext()
 
     class Config:
         @staticmethod
