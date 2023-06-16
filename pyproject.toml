@@ -1,14 +1,15 @@
 [build-system]
-requires = ["flit_core >=2,<4"]
+requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
-[tool.flit.metadata]
-module = "distiller"
-dist-name = "pydantic-distiller"
+[project]
+name = "pydantic-distiller"
 version = "0.2.5"
-author = "Arseny Gabdullin"
-author-email = "a.gabdullin@tinkoff.ru"
-home-page = "https://github.com/tinkoffjournal/distiller"
+authors = [
+    {name = "Arseny Gabdullin", email = "a.gabdullin@tinkoff.ru"},
+    {name = "Vladimir Troflyanin", email = "v.troflyanin@tinkoff.ru"}
+]
+readme = "README.md"
 classifiers = [
   "Intended Audience :: Information Technology",
   "Intended Audience :: Developers",
@@ -25,13 +26,19 @@ classifiers = [
   "Topic :: Text Processing :: Markup :: HTML",
   "License :: OSI Approved :: MIT License",
 ]
-requires = [
-  "pydantic >=1.0.0",
-]
-description-file = "README.md"
 requires-python = ">=3.6"
+dependencies = [
+    "pydantic >=1.0.0",
+]
+dynamic = ["description"]
 
-[tool.flit.metadata.requires-extra]
+[project.urls]
+Source = "https://github.com/tinkoffjournal/distiller"
+
+[tool.flit.module]
+name = "distiller"
+
+[project.optional-dependencies]
 html = [
   "beautifulsoup4 >=4.8.1",
   "lxml",
